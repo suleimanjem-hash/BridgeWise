@@ -41,8 +41,6 @@ export interface RankingCriteria {
   excludeProviders?: string[]; // providers to exclude
 }
 
-import { calculateStellarNetworkScore, StellarNetworkMetrics } from '../scoring/routes/stellar';
-
 export interface RankedRoute extends BridgeRoute {
   rank: number;
   score: number;
