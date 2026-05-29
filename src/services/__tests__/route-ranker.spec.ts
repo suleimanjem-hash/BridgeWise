@@ -1,7 +1,12 @@
 import { routeRanker } from '../route-ranker';
+import { stellarRouteHealthMonitor } from '../../monitoring/routes/stellar';
 import type { BridgeRoute } from '../route-ranker';
 
 describe('RouteRanker network-aware scoring', () => {
+  afterEach(() => {
+    stellarRouteHealthMonitor.reset();
+  });
+
   const baseRoute = (id: string, networkMetrics?: Record<string, unknown>): BridgeRoute => ({
     id,
     fromChain: 'stellar',
@@ -57,5 +62,30 @@ describe('RouteRanker network-aware scoring', () => {
 
     expect(ranked[0].breakdown.networkScore).toBe(0.5);
     expect(ranked[1].breakdown.networkScore).toBe(0.5);
+  });
+
+  it('does not recommend routes disabled by Stellar route health monitoring', async () => {
+    stellarRouteHealthMonitor.registerRoute('route-unavailable', async () => ({
+      available: false,
+      errorMessage: 'probe failed',
+    }));
+
+    await stellarRouteHealthMonitor.checkAll();
+    await stellarRouteHealthMonitor.checkAll();
+    await stellarRouteHealthMonitor.checkAll();
+
+    const routes: BridgeRoute[] = [
+      baseRoute('route-unavailable'),
+      baseRoute('route-healthy', {
+        latencyMs: 100,
+        failureRate: 0.01,
+        liquidityUsd: 5000,
+        availability: 0.98,
+        activeRouteCount: 1,
+      }),
+    ];
+
+    const ranked = routeRanker.rankRoutes(routes);
+    expect(ranked.map((route) => route.id)).not.toContain('route-unavailable');
   });
 });

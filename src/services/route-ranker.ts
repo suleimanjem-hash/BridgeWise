@@ -1,4 +1,5 @@
 import { calculateStellarNetworkScore, StellarNetworkMetrics } from '../scoring/routes/stellar';
+import { stellarRouteHealthMonitor } from '../monitoring/routes/stellar';
 
 export interface BridgeRoute {
   id: string;
@@ -39,8 +40,6 @@ export interface RankingCriteria {
   minSuccessRate?: number; // minimum acceptable success rate
   excludeProviders?: string[]; // providers to exclude
 }
-
-import { calculateStellarNetworkScore, StellarNetworkMetrics } from '../scoring/routes/stellar';
 
 export interface RankedRoute extends BridgeRoute {
   rank: number;
@@ -159,6 +158,16 @@ export class RouteRanker {
 
       // Check excluded providers
       if (criteria.excludeProviders?.includes(route.provider)) {
+        return false;
+      }
+
+      // Exclude routes that have been disabled by health monitoring.
+      if (stellarRouteHealthMonitor.isRouteDisabled(route.id)) {
+        return false;
+      }
+
+      // Exclude explicitly unavailable route metrics.
+      if (route.networkMetrics?.availability === 0) {
         return false;
       }
 
